@@ -1,46 +1,51 @@
 import sys
+sys.stdout.reconfigure(encoding='utf-8')
 
 MAX_LEN = 2000
 SEPARATOR = "\n" * 10
 
-
 def split_markdown(text, max_len=MAX_LEN):
     blocks = []
-    current = ""
-
     i = 0
-    while i < len(text):
-        remaining = max_len - len(current)
+    n = len(text)
 
-        if remaining <= 0:
-            blocks.append(current)
-            current = ""
-            continue
+    while i < n:
+        current = ""
+        byte_len = 0
+        start_i = i
 
-        # On cherche le dernier \n AVANT la limite
-        slice_end = i + remaining
-        chunk = text[i:slice_end]
+        # 🔹 ajouter des caractères tant qu'on ne dépasse pas max_len
+        while i < n:
+            c = text[i]
+            c_bytes = len(c.encode('utf-8'))
+            if byte_len + c_bytes > max_len:
+                break
+            current += c
+            byte_len += c_bytes
+            i += 1
 
-        last_newline = chunk.rfind("\n")
-
-        if last_newline != -1 and i + last_newline + 1 < len(text):
-            # coupe propre sur \n
-            current += chunk[:last_newline + 1]
-            i += last_newline + 1
+        # 🔹 essayer de couper proprement sur double saut de ligne
+        cut_pos = current.rfind("\n\n")
+        if cut_pos != -1 and cut_pos != len(current) - 1:
+            cut_pos += 2  # inclure le \n\n
         else:
-            # pas de \n → on coupe brutalement
-            current += chunk
-            i += len(chunk)
+            cut_pos = current.rfind("\n")
+            if cut_pos != -1 and cut_pos != len(current) - 1:
+                cut_pos += 1  # inclure le \n
 
-        if len(current) >= max_len:
-            blocks.append(current)
-            current = ""
+        if cut_pos != -1 and cut_pos != len(current):
+            # remettre le surplus dans le flux
+            i = start_i + cut_pos
+            current = current[:cut_pos]
 
-    if current:
         blocks.append(current)
 
-    return blocks
+        # 🔹 sécurité : si aucun caractère ajouté, avancer d'1
+        if len(current) == 0:
+            blocks.append(text[i])
+            i += 1
 
+    return blocks
 
 def main():
     if len(sys.argv) < 2:
@@ -52,15 +57,12 @@ def main():
 
     blocks = split_markdown(content)
 
-    for i, block in enumerate(blocks):
-        print(f"--- BLOC {i+1} ---\n")
-        print("```md")
+    for idx, block in enumerate(blocks):
+        print(f"--- BLOC n°{idx+1} ---\n")
         print(block)
-        print("```")
-
-        if i != len(blocks) - 1:
+        print("\n")
+        if idx != len(blocks) - 1:
             print(SEPARATOR)
-
 
 if __name__ == "__main__":
     main()
